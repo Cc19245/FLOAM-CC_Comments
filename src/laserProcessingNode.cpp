@@ -1,4 +1,4 @@
-// Author of FLOAM: Wang Han 
+// Author of FLOAM: Wang Han
 // Email wh200720041@gmail.com
 // Homepage https://wanghan.pro
 
@@ -27,7 +27,6 @@
 #include "lidar.h"
 #include "laserProcessingClass.h"
 
-
 LaserProcessingClass laserProcessing;
 std::mutex mutex_lock;
 std::queue<sensor_msgs::PointCloud2ConstPtr> pointCloudBuf;
@@ -42,16 +41,19 @@ void velodyneHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     mutex_lock.lock();
     pointCloudBuf.push(laserCloudMsg);
     mutex_lock.unlock();
-   
 }
 
-double total_time =0;
-int total_frame=0;
+double total_time = 0;
+int total_frame = 0;
 
-void laser_processing(){
-    while(1){
-        if(!pointCloudBuf.empty()){
+void laser_processing()
+{
+    while (1)
+    {
+        if (!pointCloudBuf.empty())
+        {
             //read data
+            // Step 1: 把点云从消息队列中取出来
             mutex_lock.lock();
             pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_in(new pcl::PointCloud<pcl::PointXYZI>());
             pcl::fromROSMsg(*pointCloudBuf.front(), *pointcloud_in);
@@ -59,23 +61,24 @@ void laser_processing(){
             pointCloudBuf.pop();
             mutex_lock.unlock();
 
-            pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_edge(new pcl::PointCloud<pcl::PointXYZI>());          
+            // Step 2: 从原始点云中提取特征: 非常明显的角点特征 和 不太明显的面点特征
+            pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_edge(new pcl::PointCloud<pcl::PointXYZI>());
             pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_surf(new pcl::PointCloud<pcl::PointXYZI>());
-
             std::chrono::time_point<std::chrono::system_clock> start, end;
             start = std::chrono::system_clock::now();
-            laserProcessing.featureExtraction(pointcloud_in,pointcloud_edge,pointcloud_surf);
+            laserProcessing.featureExtraction(pointcloud_in, pointcloud_edge, pointcloud_surf);
             end = std::chrono::system_clock::now();
             std::chrono::duration<float> elapsed_seconds = end - start;
             total_frame++;
             float time_temp = elapsed_seconds.count() * 1000;
-            total_time+=time_temp;
+            total_time += time_temp;
             //ROS_INFO("average laser processing time %f ms \n \n", total_time/total_frame);
 
+            // Step 3: 发布提取的角点特征和面点特征，给下一个节点使用
             sensor_msgs::PointCloud2 laserCloudFilteredMsg;
-            pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_filtered(new pcl::PointCloud<pcl::PointXYZI>());  
-            *pointcloud_filtered+=*pointcloud_edge;
-            *pointcloud_filtered+=*pointcloud_surf;
+            pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_filtered(new pcl::PointCloud<pcl::PointXYZI>());
+            *pointcloud_filtered += *pointcloud_edge;
+            *pointcloud_filtered += *pointcloud_surf;
             pcl::toROSMsg(*pointcloud_filtered, laserCloudFilteredMsg);
             laserCloudFilteredMsg.header.stamp = pointcloud_time;
             laserCloudFilteredMsg.header.frame_id = "base_link";
@@ -87,13 +90,11 @@ void laser_processing(){
             edgePointsMsg.header.frame_id = "base_link";
             pubEdgePoints.publish(edgePointsMsg);
 
-
             sensor_msgs::PointCloud2 surfPointsMsg;
             pcl::toROSMsg(*pointcloud_surf, surfPointsMsg);
             surfPointsMsg.header.stamp = pointcloud_time;
             surfPointsMsg.header.frame_id = "base_link";
             pubSurfPoints.publish(surfPointsMsg);
-
         }
         //sleep 2 ms every time
         std::chrono::milliseconds dura(2);
@@ -108,12 +109,12 @@ int main(int argc, char **argv)
 
     int scan_line = 64;
     double vertical_angle = 2.0;
-    double scan_period= 0.1;
+    double scan_period = 0.1;
     double max_dis = 60.0;
     double min_dis = 2.0;
 
-    nh.getParam("/scan_period", scan_period); 
-    nh.getParam("/vertical_angle", vertical_angle); 
+    nh.getParam("/scan_period", scan_period);
+    nh.getParam("/vertical_angle", vertical_angle);
     nh.getParam("/max_dis", max_dis);
     nh.getParam("/min_dis", min_dis);
     nh.getParam("/scan_line", scan_line);
@@ -126,13 +127,15 @@ int main(int argc, char **argv)
 
     laserProcessing.init(lidar_param);
 
-    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, velodyneHandler);
+    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(
+        "/velodyne_points", 100, velodyneHandler);
 
-    pubLaserCloudFiltered = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_points_filtered", 100);
+    pubLaserCloudFiltered = nh.advertise<sensor_msgs::PointCloud2>(
+        "/velodyne_points_filtered", 100);
 
     pubEdgePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_edge", 100);
 
-    pubSurfPoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surf", 100); 
+    pubSurfPoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surf", 100);
 
     std::thread laser_processing_process{laser_processing};
 
@@ -140,4 +143,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-

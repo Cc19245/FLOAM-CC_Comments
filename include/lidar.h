@@ -1,4 +1,4 @@
-// Author of FLOAM: Wang Han 
+// Author of FLOAM: Wang Han
 // Email wh200720041@gmail.com
 // Homepage https://wanghan.pro
 #ifndef _LIDAR_H_
@@ -6,10 +6,10 @@
 
 //define lidar parameter
 
-namespace lidar{
-
-class Lidar
+namespace lidar
 {
+    class Lidar
+    {
     public:
         Lidar();
 
@@ -21,7 +21,7 @@ class Lidar
         void setMaxDistance(double max_distance_in);
         void setMinDistance(double min_distance_in);
 
-    	double max_distance;
+        double max_distance;
         double min_distance;
         int num_lines;
         double scan_period;
@@ -30,11 +30,8 @@ class Lidar
         double horizontal_angle;
         double vertical_angle_resolution;
         double vertical_angle;
-};
-
+    };
 
 }
 
-
 #endif // _LIDAR_H_
-

@@ -1,4 +1,4 @@
-// Author of FLOAM: Wang Han 
+// Author of FLOAM: Wang Han
 // Email wh200720041@gmail.com
 // Homepage https://wanghan.pro
 
@@ -47,29 +47,36 @@ void velodyneEdgeHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
 }
 
 bool is_odom_inited = false;
-double total_time =0;
-int total_frame=0;
-void odom_estimation(){
-    while(1){
-        if(!pointCloudEdgeBuf.empty() && !pointCloudSurfBuf.empty()){
-
+double total_time = 0;
+int total_frame = 0;
+void odom_estimation()
+{
+    while (1)
+    {
+        //; 角点和面点特征都不为空，才能往下处理
+        if (!pointCloudEdgeBuf.empty() && !pointCloudSurfBuf.empty())
+        {
             //read data
+            // Step 1: 判断角点和面点的数据时间戳是否对应，一般来说没问题
             mutex_lock.lock();
-            if(!pointCloudSurfBuf.empty() && (pointCloudSurfBuf.front()->header.stamp.toSec()<pointCloudEdgeBuf.front()->header.stamp.toSec()-0.5*lidar_param.scan_period)){
+            if (!pointCloudSurfBuf.empty() && (pointCloudSurfBuf.front()->header.stamp.toSec() 
+                < pointCloudEdgeBuf.front()->header.stamp.toSec() - 0.5 * lidar_param.scan_period))
+            {
                 pointCloudSurfBuf.pop();
                 ROS_WARN_ONCE("time stamp unaligned with extra point cloud, pls check your data --> odom correction");
                 mutex_lock.unlock();
-                continue;  
+                continue;
             }
-
-            if(!pointCloudEdgeBuf.empty() && (pointCloudEdgeBuf.front()->header.stamp.toSec()<pointCloudSurfBuf.front()->header.stamp.toSec()-0.5*lidar_param.scan_period)){
+            if (!pointCloudEdgeBuf.empty() && (pointCloudEdgeBuf.front()->header.stamp.toSec() < pointCloudSurfBuf.front()->header.stamp.toSec() - 0.5 * lidar_param.scan_period))
+            {
                 pointCloudEdgeBuf.pop();
                 ROS_WARN_ONCE("time stamp unaligned with extra point cloud, pls check your data --> odom correction");
                 mutex_lock.unlock();
-                continue;  
+                continue;
             }
-            //if time aligned 
+            //if time aligned
 
+            // Step 2: 把角点和面点点云从消息中取出来
             pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_surf_in(new pcl::PointCloud<pcl::PointXYZI>());
             pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud_edge_in(new pcl::PointCloud<pcl::PointXYZI>());
             pcl::fromROSMsg(*pointCloudEdgeBuf.front(), *pointcloud_edge_in);
@@ -79,11 +86,16 @@ void odom_estimation(){
             pointCloudSurfBuf.pop();
             mutex_lock.unlock();
 
-            if(is_odom_inited == false){
+            // Step 3: 如果系统没有初始化，那么把这帧的点云当做初始的地图点云注册到地图中
+            if (is_odom_inited == false)
+            {
                 odomEstimation.initMapWithPoints(pointcloud_edge_in, pointcloud_surf_in);
                 is_odom_inited = true;
                 ROS_INFO("odom inited");
-            }else{
+            }
+            // Step 4: 重点：如果初始化完成，则把当前帧的点云和地图进行配准，或者当前帧的位姿
+            else
+            {
                 std::chrono::time_point<std::chrono::system_clock> start, end;
                 start = std::chrono::system_clock::now();
                 odomEstimation.updatePointsToMap(pointcloud_edge_in, pointcloud_surf_in);
@@ -91,20 +103,19 @@ void odom_estimation(){
                 std::chrono::duration<float> elapsed_seconds = end - start;
                 total_frame++;
                 float time_temp = elapsed_seconds.count() * 1000;
-                total_time+=time_temp;
-                ROS_INFO("average odom estimation time %f ms \n \n", total_time/total_frame);
+                total_time += time_temp;
+                ROS_INFO("average odom estimation time %f ms \n \n", total_time / total_frame);
             }
 
-
-
+            // Step 5: 发布当前帧的里程计和tf变换
             Eigen::Quaterniond q_current(odomEstimation.odom.rotation());
             //q_current.normalize();
             Eigen::Vector3d t_current = odomEstimation.odom.translation();
 
             static tf::TransformBroadcaster br;
             tf::Transform transform;
-            transform.setOrigin( tf::Vector3(t_current.x(), t_current.y(), t_current.z()) );
-            tf::Quaternion q(q_current.x(),q_current.y(),q_current.z(),q_current.w());
+            transform.setOrigin(tf::Vector3(t_current.x(), t_current.y(), t_current.z()));
+            tf::Quaternion q(q_current.x(), q_current.y(), q_current.z(), q_current.w());
             transform.setRotation(q);
             br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", "base_link"));
 
@@ -121,7 +132,6 @@ void odom_estimation(){
             laserOdometry.pose.pose.position.y = t_current.y();
             laserOdometry.pose.pose.position.z = t_current.z();
             pubLaserOdometry.publish(laserOdometry);
-
         }
         //sleep 2 ms every time
         std::chrono::milliseconds dura(2);
@@ -136,12 +146,12 @@ int main(int argc, char **argv)
 
     int scan_line = 64;
     double vertical_angle = 2.0;
-    double scan_period= 0.1;
+    double scan_period = 0.1;
     double max_dis = 60.0;
     double min_dis = 2.0;
     double map_resolution = 0.4;
-    nh.getParam("/scan_period", scan_period); 
-    nh.getParam("/vertical_angle", vertical_angle); 
+    nh.getParam("/scan_period", scan_period);
+    nh.getParam("/vertical_angle", vertical_angle);
     nh.getParam("/max_dis", max_dis);
     nh.getParam("/min_dis", min_dis);
     nh.getParam("/scan_line", scan_line);
@@ -154,8 +164,10 @@ int main(int argc, char **argv)
     lidar_param.setMinDistance(min_dis);
 
     odomEstimation.init(lidar_param, map_resolution);
-    ros::Subscriber subEdgeLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_edge", 100, velodyneEdgeHandler);
-    ros::Subscriber subSurfLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_surf", 100, velodyneSurfHandler);
+    ros::Subscriber subEdgeLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(
+        "/laser_cloud_edge", 100, velodyneEdgeHandler);
+    ros::Subscriber subSurfLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(
+        "/laser_cloud_surf", 100, velodyneSurfHandler);
 
     pubLaserOdometry = nh.advertise<nav_msgs::Odometry>("/odom", 100);
     std::thread odom_estimation_process{odom_estimation};
@@ -164,4 +176,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
