@@ -1,0 +1,18 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "",
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "includePath": [
+        "/home/cc/slam_dev/hardware_driver/livox_driver/devel/include/**",
+        "/opt/ros/melodic/include/**",
+        "/home/cc/slamWorkspace/myLearn/FLOAM-CC_Comments-ws/src/floam/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS"
+    }
+  ],
+  "version": 4
+}
