@@ -16,6 +16,3 @@
 ## Acknowledgements
 
 - [floam](https://github.com/wh200720041/floam)
-
-- [
-featureBaseMatching_aloam_and_floam](https://github.com/qqngwzlb/featureBaseMatching_aloam_and_floam)
